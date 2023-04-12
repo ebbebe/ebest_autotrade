@@ -215,7 +215,7 @@ class XAQuery:
                         IsAny = True
                         
                 if(IsAny == False):
-                    self.order_stock(stock_code, buy_amount, 0, 2, '03')
+                    self.order_stock(stock_code, buy_amount, 0, 2, '03') # 시장가에 매수
                     # 참고) self.order_stock("종목코드","수량","가격","2", "03")
                     
                 
@@ -432,10 +432,9 @@ class Main:
         xa_query = XAQuery()
         xa_query.t1857_Event = win32com.client.DispatchWithEvents("XA_DataSet.XAQuery", XAQuery)
         xa_query.t1857_Event.ResFileName = "C:\\eBEST\\xingAPI\\Res\\t1857.res"
-        xa_query.search_condition("조건식테스트") # 등락율상위100
-        
-        
-        
+        xa_query.search_condition("지그재그") # 조건식 이름 저장
+
+
         
         
         
