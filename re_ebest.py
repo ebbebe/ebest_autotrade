@@ -210,7 +210,6 @@ class XAQuery:
                 # 보유 종목일시 구매 X
                 IsAny = False
                 for stock in my_stock_info:
-                    # print("보유종목:", stock['종목번호'])
                     if(stock['종목번호'] == stock_code):
                         IsAny = True
                         
@@ -219,8 +218,7 @@ class XAQuery:
                     # 참고) self.order_stock("종목코드","수량","가격","2", "03")
                     
                 
-                # print("result_name: ", stock_name, flush=True)
-                # print("result_state: ", stock_state, flush=True)
+                
                 
             
             
@@ -317,7 +315,7 @@ class XAQuery:
                 LENGTH_BOUGHT_STOCK = len(my_stock_info)
             print("거래하려는 종목번호: {}, 보유주식 최대 개수: {}".format(dict_bought_stock_info['종목번호'], LENGTH_BOUGHT_STOCK))
             
-            NEW_STOCK_LIST.append(dict_bought_stock_info)
+            NEW_STOCK_LIST.append(dict_bought_stock_info) # 실시간 데이터 등록 위한 리스트
 
         
         if bns_type == 1: # 매도 했다면
@@ -375,7 +373,6 @@ class Main:
         self.user = config[run_mode]['user']
         self.passwd = config[run_mode]['password']
         self.cert_passwd = config[run_mode]['cert_passwd']
-        CERT_PASSWORD = config[run_mode]['cert_passwd']
         self.host = config[run_mode]['host']
         self.port = config[run_mode]['port']
         self.account = config[run_mode]['account']
@@ -389,10 +386,6 @@ class Main:
         SELL_STOCK_LIST = []
         
         
-        # global SELL_CONDITION_1
-        # global SELL_CONDITION_2
-        # SELL_CONDITION_1 = False # 판매조건 만족하는지 판단
-        # SELL_CONDITION_2 = False # 판매조건 만족하는지 판단2
         
 
         self.session = win32com.client.DispatchWithEvents("XA_Session.XASession", XASession)
@@ -487,7 +480,6 @@ class Main:
         while xa_query.tr_run_state == 0:
             pythoncom.PumpWaitingMessages()
         
-        stock_ = {}
         # 요청한 값 반복문으로 받아오기
         count = xa_query.GetBlockCount("CSPAQ12300OutBlock3")
         result = []

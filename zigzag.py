@@ -31,12 +31,12 @@ class XAReal:
         
         
         
-        if (szTrCode == 'S3_') or (szTrCode == 'K3_'):
+        if (szTrCode == 'S3_') or (szTrCode == 'K3_'): # 체결 관련
             # chetime = self.GetFieldData("OutBlock", "chetime")  # 체결시간
             # sign = self.GetFieldData("OutBlock", "sign")  # 전일대비구분
             # change = self.GetFieldData("OutBlock", "change")  # 전일대비
             # drate = self.GetFieldData("OutBlock", "drate")  # 등락율
-            # price = self.GetFieldData("OutBlock", "price")  # 현재가
+            price = float(self.GetFieldData("OutBlock", "price"))  # 현재가
             # opentime = self.GetFieldData("OutBlock", "opentime")  # 시가시간
             # open = self.GetFieldData("OutBlock", "open")  # 시가
             # hightime = self.GetFieldData("OutBlock", "hightime")  # 고가시간
@@ -63,61 +63,20 @@ class XAReal:
             
             stock = Main.search_stock_info(Main, shcode)
             
+            for waiting_stock in waiting_stock_info:
+                if waiting_stock['종목번호'] == shcode:
+                    print("waiting_stock : {}, 현재가: {}".format(waiting_stock, price))
+                    initial_price = float(waiting_stock['진입가'])
+                    hoga = float(Main.cal_hoga(Main, initial_price))
+                    
+                    if (initial_price + (hoga * 5)) <= price: # (진입가 + 5호가) 보다 현재가가 높다면 매수
+                        waiting_stock_info.remove(waiting_stock)
+                        BUY_STOCK_LIST.append(waiting_stock)
+                        print("{}, 구매목록에 추가".format(stock['종목명']))
+                        # 실시간 해제 해야함
+                        
             
-            for my_stock in my_stock_info:
-                if my_stock['종목번호'] == shcode:
-                    
-                    if my_stock['체결강도'] == -1:
-                        print("딕셔너리에 체결강도 정보 없음")
-                        my_stock['체결강도'] = cpower
-                        my_stock['최대체결강도'] = cpower
-                        SELL_CONDITION_1 = False
-                    
-                    elif (my_stock['최대체결강도'] > cpower+1): # 최대체결강도가 현재 체결강도보다 1이상 높으면 조건1 만족
-                        SELL_CONDITION_1 = True
-                        # print("{} 조건1 달성 / 이전: {}, 이후: {}, 최대: {}".format(my_stock['종목명'], my_stock['체결강도'], cpower, my_stock['최대체결강도']))
-                    else:
-                        # print("{} 조건1 미달성 / 최대체결강도: {}".format(my_stock['종목명'], my_stock['최대체결강도']))
-                        SELL_CONDITION_1 = False
-                    
-                    
-                    
-                    my_stock['판매조건1'] = SELL_CONDITION_1
-                    my_stock['체결강도'] = cpower
-                    
-                    if my_stock['최대체결강도'] < cpower:
-                        my_stock['최대체결강도'] = cpower
-        
-        
-        if (szTrCode == 'H1_') or (szTrCode == 'HA_'):
-            total_sell_jan = int(self.GetFieldData("OutBlock", "totofferrem")) # 총매도호가잔량
-            total_buy_jan = int(self.GetFieldData("OutBlock", "totbidrem")) # 총매수호가잔량
-            shcode = self.GetFieldData("OutBlock", "shcode")  # 단축코드
-                
-            
-            for stock in my_stock_info:
-                if shcode == stock['종목번호']:
-                    if total_sell_jan < total_buy_jan:
-                        # print("{} 조건2 달성 / 총매수: {}, 총매도: {}".format(stock['종목명'],total_buy_jan, total_sell_jan))
-                        SELL_CONDITION_2 = True
-                    else:
-                        # print("{} 조건2 미달성".format(stock['종목명']))
-                        SELL_CONDITION_2 = False
-                    stock['판매조건2'] = SELL_CONDITION_2
-                    stock['총매도호가잔량'] = total_sell_jan
-                    stock['총매수호가잔량'] = total_buy_jan
-                    
-            
-
-
-        if (szTrCode == 'S3_') or (szTrCode == 'K3_') or (szTrCode == 'H1_') or (szTrCode == 'HA_'):
-            shcode = self.GetFieldData("OutBlock", "shcode")  # 단축코드
-            for stock in my_stock_info:
-                if shcode == stock['종목번호']:
-                    if ((stock['판매조건1'] == True) and (stock['판매조건2'] == True)):
-                        SELL_STOCK_LIST.append(stock)
-                        print("판매 리스트:\n{}".format(SELL_STOCK_LIST))
-                        print("판매될 종목 정보:\n{}".format(stock))
+           
             
     
 
@@ -139,7 +98,7 @@ class XAReal:
         for stock in all_stock_info:
             if shcode == stock['단축코드']:
                 target_stock = stock
-                
+        
         gubun = target_stock['시장구분']
         
         
@@ -183,7 +142,7 @@ class XAQuery:
     def OnReceiveData(self, code):
         
         self.tr_run_state = 1
-        print("XAQuery 데이터 수신 :", code)
+        # print("XAQuery 데이터 수신 :", code)
         
         if code == "t1857":
             stock_AlertNum = self.GetFieldData("t1857OutBlock", "AlertNum", 0)
@@ -201,26 +160,45 @@ class XAQuery:
             # 이곳에 구매로직 작성
             stock_state = self.GetFieldSearchRealData("t1857OutBlock1", "JobFlag")
             if stock_state != 'O': # 이탈이 아닐 시 실행
-                # stock_name = self.GetFieldSearchRealData("t1857OutBlock1", "hname")
+                stock_name = self.GetFieldSearchRealData("t1857OutBlock1", "hname")
                 stock_code = self.GetFieldSearchRealData("t1857OutBlock1", "shcode")
                 stock_price = int(self.GetFieldSearchRealData("t1857OutBlock1", "price"))
                 buy_amount = int(BUY_STANDARD_AMOUNT / stock_price)
+                print("(진입 or 재진입) 종목명 : {}, 진입가 : {}".format(stock_name, stock_price))
                 
-
-                # 보유 종목일시 구매 X
-                IsAny = False
+                
+                # 이미 산 종목이거나 사려고 추적중인 종목이라면 패스
+                is_existing = False
+                for stock in my_stock_info: 
+                    if stock['종목번호'] == stock_code:
+                        is_existing = True
+                
+                for stock in waiting_stock_info:
+                    if stock['종목번호'] == stock_code:
+                        is_existing = True
+                
+                if is_existing == False: # 미보유, 미추적 종목 = 추적 등록
+                    stock = {'종목번호' : stock_code, '종목명' : stock_name, '진입가' : stock_price, '구매수량' : buy_amount}
+                    waiting_stock_info.append(stock)
+                    WAITING_STOCK_LIST.append(stock)
+            
+            
+            if stock_state == 'O':
+                stock_name = self.GetFieldSearchRealData("t1857OutBlock1", "hname")
+                stock_code = self.GetFieldSearchRealData("t1857OutBlock1", "shcode")
+                stock_price = int(self.GetFieldSearchRealData("t1857OutBlock1", "price"))
+                
+                print("(이탈) 종목명 : {}, 현재가 : {}".format(stock_name, stock_price))
                 for stock in my_stock_info:
-                    # print("보유종목:", stock['종목번호'])
-                    if(stock['종목번호'] == stock_code):
-                        IsAny = True
-                        
-                if(IsAny == False):
-                    self.order_stock(stock_code, buy_amount, 0, 2, '03') # 시장가에 매수
-                    # 참고) self.order_stock("종목코드","수량","가격","2", "03")
+                    if stock['종목번호'] == stock_code:
+                        print("(이탈) {} 판매".format(stock_name))
+                        SELL_STOCK_LIST.append(stock)
+                
+                
+                
+                
                     
                 
-                # print("result_name: ", stock_name, flush=True)
-                # print("result_state: ", stock_state, flush=True)
                 
             
             
@@ -284,7 +262,7 @@ class XAQuery:
         dict_bought_stock_info['매도가'] = -1
         dict_bought_stock_info['매수가'] = -1
         dict_bought_stock_info['현재가'] = OrdPrc
-        dict_bought_stock_info['평균단가'] = -1
+        dict_bought_stock_info['평균단가'] = OrdPrc
         dict_bought_stock_info['손익율'] = 0
         dict_bought_stock_info['잔고평가금액'] = -1
         dict_bought_stock_info['판매조건1'] = False
@@ -294,7 +272,6 @@ class XAQuery:
         
         if(bns_type == 2): # 매수 했다면 구매한 주식 보유 주식 리스트에 추가
             target_stock = Main.search_stock_info(Main, dict_bought_stock_info['종목번호'])
-            print("target_stock 값: {}".format(target_stock))
             
             
             bought_stock_gubun = target_stock['시장구분']
@@ -315,15 +292,15 @@ class XAQuery:
             
             if LENGTH_BOUGHT_STOCK < len(my_stock_info): # 최대 몇개까지 주식 보유하는지 갱신
                 LENGTH_BOUGHT_STOCK = len(my_stock_info)
-            print("거래하려는 종목번호: {}, 보유주식 최대 개수: {}".format(dict_bought_stock_info['종목번호'], LENGTH_BOUGHT_STOCK))
+            print("[매수] 종목번호: {}, 보유주식 최대 개수: {}".format(dict_bought_stock_info['종목번호'], LENGTH_BOUGHT_STOCK))
             
-            NEW_STOCK_LIST.append(dict_bought_stock_info)
+            # NEW_STOCK_LIST.append(dict_bought_stock_info)
 
         
         if bns_type == 1: # 매도 했다면
             for stock in my_stock_info:
                 if dict_bought_stock_info['종목번호'] == stock['종목번호']:
-                    print("거래하려는 종목번호: ", dict_bought_stock_info['종목번호'])
+                    # print("거래하려는 종목번호: ", dict_bought_stock_info['종목번호'])
                     bought_qty = int(stock['매매기준잔고수량'])
                     sell_qty = int(qty)
                     after_qty = bought_qty - sell_qty
@@ -359,6 +336,7 @@ class XAQuery:
         xareal.K3__Event.UnadviseRealData()
         xareal.H1__Event.UnadviseRealData()
         xareal.HA__Event.UnadviseRealData()
+        
 
           
 
@@ -375,7 +353,6 @@ class Main:
         self.user = config[run_mode]['user']
         self.passwd = config[run_mode]['password']
         self.cert_passwd = config[run_mode]['cert_passwd']
-        CERT_PASSWORD = config[run_mode]['cert_passwd']
         self.host = config[run_mode]['host']
         self.port = config[run_mode]['port']
         self.account = config[run_mode]['account']
@@ -383,16 +360,15 @@ class Main:
         PASSWORD = config[run_mode]['password']
         global ACCOUNT
         ACCOUNT = config[run_mode]['account']
-        global NEW_STOCK_LIST
-        NEW_STOCK_LIST = []
+        # global NEW_STOCK_LIST
+        # NEW_STOCK_LIST = []
         global SELL_STOCK_LIST
         SELL_STOCK_LIST = []
+        global BUY_STOCK_LIST
+        BUY_STOCK_LIST = []
+        global WAITING_STOCK_LIST
+        WAITING_STOCK_LIST = []
         
-        
-        # global SELL_CONDITION_1
-        # global SELL_CONDITION_2
-        # SELL_CONDITION_1 = False # 판매조건 만족하는지 판단
-        # SELL_CONDITION_2 = False # 판매조건 만족하는지 판단2
         
 
         self.session = win32com.client.DispatchWithEvents("XA_Session.XASession", XASession)
@@ -408,6 +384,9 @@ class Main:
         print("보유계좌: ", my_stock_info)
         global all_stock_info
         all_stock_info = self.get_all_stock_info()
+        global waiting_stock_info
+        waiting_stock_info = []
+        
 
                     
         
@@ -441,17 +420,32 @@ class Main:
         
         try:
             while True:
-                if len(NEW_STOCK_LIST) > 0: # 등록해야할 실시간 데이터 있는지 확인
-                    print("매수할 주식: ", NEW_STOCK_LIST)
-                    nStock = NEW_STOCK_LIST.pop(0)
+                # if len(NEW_STOCK_LIST) > 0: # 등록해야할 실시간 데이터 있는지 확인
+                #     nStock = NEW_STOCK_LIST.pop(0)
+                #     print("NEW_STOCK_LIST[0] : {}".format(nStock))
+                #     xa_real.regit_stock_real(nStock['종목번호'])
+                    
+                if len(WAITING_STOCK_LIST) > 0: # 등록해야할 구매대기주식(지그재그) 있는지 확인
+                    nStock = WAITING_STOCK_LIST.pop(0)
+                    print("실시간(체결) 등록 : {}".format(nStock))
                     xa_real.regit_stock_real(nStock['종목번호'])
                     
+                if len(BUY_STOCK_LIST) > 0:
+                    nStock = BUY_STOCK_LIST.pop(0)
+                    print("구매 : {}".format(nStock))
+                    shcode = nStock['종목번호']
+                    qty = nStock['구매수량']
+                    xa_query.order_stock(shcode, qty, 0, 2, "03") # 매수
+                    
+                
                 if len(SELL_STOCK_LIST) > 0: # 매도할 주식 있는지 확인
                     sStock = SELL_STOCK_LIST.pop(0)
                     for mStock in my_stock_info:
                         if sStock['종목번호'] == mStock['종목번호']:
                             qty = mStock['매매기준잔고수량']
-                            xa_query.order_stock(sStock['종목번호'], qty, 0, 1, "03")
+                            shcode = sStock['종목번호']
+                            xa_query.order_stock(shcode, qty, 0, 1, "03") # 매도
+                    print("판매 : {}".format(sStock))
                     xa_real.remove_real_shcode(sStock['종목번호'])
                 pythoncom.PumpWaitingMessages()
         except KeyboardInterrupt:
@@ -486,7 +480,6 @@ class Main:
         while xa_query.tr_run_state == 0:
             pythoncom.PumpWaitingMessages()
         
-        stock_ = {}
         # 요청한 값 반복문으로 받아오기
         count = xa_query.GetBlockCount("CSPAQ12300OutBlock3")
         result = []
@@ -496,14 +489,17 @@ class Main:
                 value = xa_query.GetFieldData("CSPAQ12300OutBlock3", param, i)
                 stock[param] = value
             result.append(stock)
-            
         # 매개변수 한국어로 전환
         self.wrap_param_korean(result, "CSPAQ12300", "CSPAQ12300OutBlock3")
         
+        hoga =  self.cal_hoga(float(stock['평균단가']))
         for stock in result:
+            stock['호가'] = hoga
+            stock['진입가'] = stock['평균단가']
             stock['체결강도'] = -1
             stock['판매조건1'] = False
             stock['판매조건2'] = False
+        
         
         return result
 
@@ -568,6 +564,35 @@ class Main:
                 return stock
     
     
+    def cal_hoga(self, price): # etf, etn, elw 상품: 5원 
+        """호가단위 계산함수
+
+        Args:
+            price (_type_): 가격
+
+        Returns:
+            _type_: 호가단위
+        """
+        hoga_unit = 0
+
+        if price < 1000:
+            hoga_unit = 1
+        elif price < 2000:
+             hoga_unit = 1
+        elif price >= 2000 and price <= 5000:
+            hoga_unit = 5
+        elif price > 5000 and price <= 20000:
+            hoga_unit = 10
+        elif price > 20000 and price <= 50000:
+            hoga_unit = 50
+        elif price > 50000 and price <= 200000:
+            hoga_unit = 100
+        elif price > 200000 and price <= 500000:
+            hoga_unit = 500
+        elif price > 500000:
+            hoga_unit = 1000
+            
+        return hoga_unit
     
     
     
